@@ -1,0 +1,53 @@
+
+.sensor-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 50px 20px;
+  text-align: center;
+}
+
+
+.sensor-title {
+  text-align: center;  
+  font-size: 2.5rem;
+  font-weight: bold;
+  margin-bottom: 40px;
+  margin-top: 10px;
+}
+
+
+.sensor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;                  /* added semicolon */
+  justify-content: center;    /* centers the entire grid */
+  align-items: start;         /* aligns cards vertically */
+  margin: 0 auto;             /* centers within container */
+  width: 90%;   
+}
+
+
+.sensor-card {
+  border: 0.5px solid #222;
+  border-radius: 16px;
+  padding: 25px;
+  transition: all 0.3s ease;
+}
+
+.sensor-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 18px rgba(255, 255, 255, 0.1);
+}
+
+
+@media (max-width: 900px) {
+  .sensor-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .sensor-grid {
+    grid-template-columns: 1fr;
+  }
+}

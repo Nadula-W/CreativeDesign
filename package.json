@@ -1,0 +1,25 @@
+{
+  "dependencies": {
+    "@coreui/coreui": "^5.4.3",
+    "@coreui/react": "^5.9.1",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/material": "^7.3.4",
+    "@mui/x-charts": "^8.14.0",
+    "@tailwindcss/vite": "^4.1.14",
+    "bootstrap": "^5.3.8",
+    "boxicons": "^2.1.4",
+    "lodash": "^4.17.21",
+    "lucide-react": "^0.545.0",
+    "mongodb": "^6.20.0",
+    "react-bootstrap": "^2.10.10",
+    "react-boxicons": "^0.0.28",
+    "react-icons": "^5.5.0",
+    "react-router-dom": "^6.30.1",
+    "recharts": "^3.3.0",
+    "vite": "^7.1.9"
+  },
+  "scripts": {
+    
+  }
+}

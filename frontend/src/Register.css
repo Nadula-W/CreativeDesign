@@ -1,0 +1,10 @@
+body {
+  margin: 0;
+  padding: 0;
+  background-color: white;
+  color: black;
+  font-family: sans-serif;
+}
+.one{
+  justify-content:start;
+}

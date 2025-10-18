@@ -1,0 +1,176 @@
+/* ===== SIDEBAR CONTAINER ===== */
+.sidebar {
+  height: 100%;
+  width: 240px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  background: #141414;
+  font-family: "Poppins", sans-serif;
+  transition: width 0.25s ease;
+  overflow-x: hidden;
+  z-index: 100;
+}
+
+.sidebar.collapsed {
+  width: 72px;
+}
+
+/* ===== LOGO AREA ===== */
+.logo_content {
+  height: 55px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  color: #fff;
+  border-bottom: 1px solid #1e1e1e;
+}
+
+.menu_btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 22px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.menu_btn:hover {
+  color: #00ff0a;
+  justify-content: center;
+  padding: 0;
+}
+
+.logo_name {
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 16px;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+/* hide logo text when collapsed */
+.sidebar.collapsed .logo_name {
+  opacity: 0;
+  transform: translateX(-6px);
+  pointer-events: none;
+}
+
+/* ===== NAVIGATION LISTS ===== */
+.navlist,
+.navlist2 {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  margin: 0;
+  list-style: none;
+}
+
+.navlist2 {
+  position: absolute;
+  bottom: 10px;
+  width: 100%;
+}
+
+/* ===== NAVIGATION LINKS ===== */
+.navlink {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;              
+  padding: 0 16px;           
+  position: relative;
+  color: #d1d1d1;
+  text-decoration: none;
+  border-left: 4px solid transparent;
+  transition: 0.25s ease;
+  white-space: nowrap;
+}
+
+.navlink:hover {
+  background: #1e1e1e;
+  color: #00ff0a;
+  border-left-color: #00ff0a;
+  box-shadow: 0 0 10px #00ff0a33;
+}
+
+/* ===== ACTIVE LINK (if using NavLink) ===== */
+.navlink.active {
+  background: #1e1e1e;
+  color: #00ff0a;
+  border-left-color: #00ff0a;
+  box-shadow: 0 0 10px #00ff0a33;
+}
+
+/* ===== ICONS (REACT ICONS) ===== */
+.navlink svg {
+  display: block;
+  font-size: 20px;
+  min-width: 20px;
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.navlink:hover svg {
+  transform: scale(1.1);
+}
+
+
+.linktext {
+  color: inherit;
+  font-size: 14px;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+/* hide text when collapsed */
+.sidebar.collapsed .linktext {
+  display: none;
+}
+
+.sidebar.collapsed .menu_btn {
+  justify-content: center;
+  padding-left: 12px;
+  
+}
+
+/* collapsed: center icons perfectly */
+.sidebar.collapsed .navlink {
+  justify-content: center;
+  padding: 0;
+  border-left-width: 0;
+  gap: 0;
+}
+
+/* collapsed: icons aligned center */
+.sidebar.collapsed .navlink svg {
+  margin: 0;
+}
+
+/* ===== MAIN CONTENT SHIFT ===== */
+.main_content {
+  margin-left: 240px;
+  padding: 20px;
+  min-height: 100vh;
+  background: #fff;
+  transition: margin-left 0.25s ease;
+}
+
+.main_content.shifted {
+  margin-left: 72px;
+}
+
+
+
+/* ===== SCROLLBAR STYLE (optional aesthetic) ===== */
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: #00ff0a55;
+  border-radius: 10px;
+}

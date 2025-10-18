@@ -1,0 +1,351 @@
+.dept-wrap {
+  width: 100%;
+  max-width: 1100px;           
+  margin: 0 auto;
+  padding: 12px 16px;
+}
+
+.dept-card {
+  position: relative;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 18px 48px -14px rgba(0,0,0,0.18);
+  overflow: hidden;
+  padding: 18px 18px 14px 18px; 
+}
+
+.dept-card::before {
+  content: "";
+  position: absolute;
+  inset: -40% 40% 55% -20%;
+  background: radial-gradient(900px 260px at 0% 0%, rgba(34,197,94,0.13), transparent 60%);
+  pointer-events: none;
+}
+
+.dept-card::after {
+  content: "";
+  position: absolute;
+  inset: 60% -25% -50% 60%;
+  background: radial-gradient(900px 260px at 100% 100%, rgba(251,191,36,0.12), transparent 60%);
+  pointer-events: none;
+}
+
+.lora-text {
+  font-family: "Lora", serif;
+  font-optical-sizing: auto;
+  font-weight: 400;   
+  font-style: normal;
+}
+
+/* Department Head styling */
+.dept-head {
+  margin: 0 0 8px 0;
+  text-align: center;
+  color: #475569; /* optional soft gray-blue tone */
+  font-family: "Lora", serif;
+  font-weight: 500;
+  font-size: 1.1rem;
+}
+
+/* Department Title styling */
+.dept-title {
+  margin: 0;
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #0f172a; /* dark navy tone */
+  letter-spacing: 0.2px;
+  text-align: center;
+  font-family: "Lora", serif;
+}
+
+.dept-sub {
+  margin: 4px 2px 0 2px;
+  color: #475569;              /* slate-600 */
+  font-size: .96rem;
+}
+
+/* ====== Tabs (kill Bootstrap gaps/underline, use pills) ====== */
+.dept-tabs.nav-pills {
+  margin: 8px 2px 2px 2px;     /* minimal top/bottom spacing */
+  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  border-bottom: none;         /* ensure no underline bar */
+}
+
+/* pill look */
+.dept-tabs .nav-link {
+  border: none !important;
+  border-radius: 999px !important;
+  background: #f1f5f9;         /* slate-100 */
+  color: #0f172a;              /* slate-900 */
+  padding: 10px 14px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: none;
+  transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease;
+}
+
+
+.dept-tabs .nav-link:hover {
+  background: #e2e8f0;         
+  transform: translateY(-1px);
+}
+
+/* active */
+.dept-tabs .nav-link.active,
+.dept-tabs .show > .nav-link {
+  background: #22c55e;         /* green-500 */
+  color: #fff !important;
+  box-shadow: 0 10px 26px rgba(34,197,94,.25);
+}
+
+/* remove stray spacing from bootstrap around content */
+.dept-tabs ~ .tab-content,
+.tab-content {
+  margin-top: 6px;             /* tiny gap below pills */
+}
+
+
+.dept-panel {
+  padding: 8px 4px 2px 4px;    
+  background: linear-gradient(180deg, rgba(2,6,23,0.02), rgba(2,6,23,0));
+  border-radius: 12px;
+}
+
+.dept-panel .sensor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;                   /
+}
+
+/* make the individual meter card edges feel crisp */
+.dept-panel .sensor-card > * {
+  border-radius: 14px !important;
+}
+
+/* mobile: keep pills scrollable, no wrapping that causes big gaps */
+@media (max-width: 640px) {
+  .dept-tabs.nav-pills {
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 6px;
+  }
+  .dept-tabs .nav-item { display: inline-block; }
+}
+.machine-overview {
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.h {
+  font-size: 22px;
+  color: #000000;
+  text-align: center;
+  margin-bottom: 15px;
+  letter-spacing: 0.5px;
+  font-family: 'Poppins', sans-serif;
+}
+
+.click {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #00ff0a;
+  color: #000;
+  border: none;
+  border-radius: 12px;
+  padding: 8px 20px;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.click:hover {
+  background-color: #00ff0a;
+  box-shadow: 0 0 10px #00ff0a;
+  transform: scale(1.05);
+}
+.inline-panel {
+  margin-top: 16px;
+  background: #171717;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 16px;
+  color: #eaeaea;
+}
+
+/* --- Inline Panel (White background) --- */
+.inline-panel {
+  margin-top: 16px;
+  background: #ffffff;
+  border: 2px solid #dcdcdc;
+  border-radius: 12px;
+  padding: 18px;
+  color: #111; /* dark text */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Header bar */
+.inline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  border-bottom: 2px solid #e5e5e5;
+  padding-bottom: 6px;
+}
+
+.inline-title {
+  font-weight: 700;
+  font-size: 18px;
+  color: #111;
+}
+
+.inline-actions .btn {
+  margin-left: 8px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+/* Neon green theme */
+.btn-success,
+.badge-success,
+.progress-bar {
+  background-color: #00ff0a !important;
+  color: #000 !important;
+}
+
+.btn-outline-light {
+  color: #00aa33 !important;
+  border: 1px solid #00aa33 !important;
+}
+
+.btn-outline-light:hover {
+  background-color: #00ff0a !important;
+  color: #000 !important;
+  border: 1px solid #00ff0a !important;
+}
+
+/* KPI Cards */
+.kpi-card {
+  background: #fafafa;
+  border: 2px solid #e5e5e5;
+  border-radius: 12px;
+  transition: 0.2s ease;
+}
+
+.kpi-card:hover {
+  border-color: #00ff0a;
+  box-shadow: 0 0 12px rgba(0, 255, 10, 0.3);
+}
+
+.kpi-card .card-title {
+  font-size: 0.9rem;
+  color: #444;
+  margin-bottom: 6px;
+}
+
+.kpi-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: #111;
+}
+
+.kpi-value .unit {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
+.kpi-sub {
+  font-size: 12px;
+  color: #777;
+}
+
+/* Panel card (Health + Machines) */
+.panel-card {
+  background: #fafafa;
+  border: 2px solid #e5e5e5;
+  border-radius: 12px;
+}
+
+.panel-title {
+  font-weight: 700;
+  color: #111;
+}
+
+/* Machine table */
+.machine-table thead th {
+  color: #444;
+  font-weight: 600;
+  border-bottom: 2px solid #e5e5e5;
+  background-color: #f9f9f9;
+}
+
+.machine-table tbody td {
+  color: #222;
+  border-bottom: 1px solid #e5e5e5;
+  vertical-align: middle;
+}
+
+.machine-table tr:hover td {
+  background-color: #f1fff3; /* subtle neon-tinted hover */
+}
+
+/* Progress bar */
+.progress {
+  background-color: #e5e5e5;
+  border-radius: 8px;
+}
+
+.progress-bar {
+  background-color: #00ff0a;
+  color: #000;
+  font-weight: 600;
+}
+
+/* Button (neon style) */
+.machine-overview .click {
+  background-color: #00ff0a;
+  color: #000;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 22px;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 12px rgba(0, 255, 10, 0.4);
+}
+
+.machine-overview .click:hover {
+  background-color: #00cc08;
+  box-shadow: 0 0 20px rgba(0, 255, 10, 0.6);
+  transform: translateY(-1px);
+}
+
+.h {
+  color: #111;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+/* Badge colors for statuses */
+.badge-success {
+  background-color: #00ff0a !important;
+  color: #000 !important;
+}
+.badge-warning {
+  background-color: #ffbf00 !important;
+  color: #000 !important;
+}
+.badge-danger {
+  background-color: #ff4d4d !important;
+  color: #fff !important;
+}
