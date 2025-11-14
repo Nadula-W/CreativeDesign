@@ -30,7 +30,7 @@ export default function Nametabs() {
       {/* Sidebar */}
       <NavBar onCollapse={setCollapsed} />
 
-      {/* Main content shifts when sidebar collapses */}
+      
       <main className={`main_content ${collapsed ? "shifted" : ""}`}>
         <div className="dept-wrap">
           <div className="dept-card">
@@ -70,7 +70,7 @@ export default function Nametabs() {
                 </div>
               </Tab>
 
-          
+          {/* anik departments tika cooment karala thiyenne 
               <Tab eventKey="Dep2" title="Department 2">
                 <div className="dept-panel">
                   <Sensorreading2 idPrefix="dep2" />
@@ -135,6 +135,7 @@ export default function Nametabs() {
                   )}
                 </div>
               </Tab>
+              */}
             </Tabs>
           </div>
         </div>

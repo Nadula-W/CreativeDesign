@@ -5,6 +5,7 @@ import Register from "./Register";
 import Dashboard from "./Dashboard";
 import Analytics from "./Analytics";
 import "boxicons/css/boxicons.min.css";
+import EmergencyDashboard from "./EmergencyDashboard";
 
 const NotFound = () => <div style={{ padding: 24 }}>404 — Not found</div>;
 
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/analytics" element={<Analytics />} />
+        <Route path="/EmergencyDashboard" element={<EmergencyDashboard/>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

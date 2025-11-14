@@ -39,7 +39,7 @@ export default function NavBar({ onCollapse }) {
           </Link>
         </li>
         <li>
-          <Link to="/emergency" className="navlink">
+          <Link to="/EmergencyDashboard" className="navlink">
             <GrEmergency />
             <span className="linktext">Emergency Buttons</span>
           </Link>

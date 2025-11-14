@@ -23,7 +23,7 @@ export default function Signup() {
     if (!ok) return; //mokuth enter kare nathnm return wenna kiyala
 
     axios
-      .post("http://localhost:5000/api/login", { username: form.username, password: form.password })
+      .post("http://localhost:3000/api/login", { username: form.username, password: form.password })
       .then((result) => {
         console.log(result);
         navigate("/home");
