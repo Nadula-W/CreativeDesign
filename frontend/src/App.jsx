@@ -6,6 +6,7 @@ import Dashboard from "./Dashboard";
 import Analytics from "./Analytics";
 import "boxicons/css/boxicons.min.css";
 import EmergencyDashboard from "./EmergencyDashboard";
+import WorkerSafety from "./WorkerSafety";
 
 const NotFound = () => <div style={{ padding: 24 }}>404 — Not found</div>;
 
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/EmergencyDashboard" element={<EmergencyDashboard/>} />
+        <Route path="/WorkerSafety" element={<WorkerSafety/>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

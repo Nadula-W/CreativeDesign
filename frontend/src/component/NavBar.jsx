@@ -33,7 +33,7 @@ export default function NavBar({ onCollapse }) {
           </Link>
         </li>
         <li>
-          <Link to="/workers" className="navlink">
+          <Link to="/WorkerSafety" className="navlink">
             <GrUserWorker />
             <span className="linktext">Worker Check-ins</span>
           </Link>

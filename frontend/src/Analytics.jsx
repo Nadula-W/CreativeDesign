@@ -1,4 +1,7 @@
+// src/Analytics.jsx
 import React, { useMemo, useState, useEffect } from "react";
+import axios from "axios";
+import { io as ioClient } from "socket.io-client";
 import {
   Container, Row, Col, Card, Button, Form, Table, Badge,
 } from "react-bootstrap";
@@ -8,37 +11,37 @@ import {
 } from "recharts";
 import "./Analytics.css";
 
-// NOTE: Departments are renamed here.
+// ======= CONFIG =======
+const SOCKET_URL = "http://192.168.0.100:3000";
+const API_BASE = "http://192.168.0.100:3000";
+const HISTORY_LIMIT = 72; // points to keep (matches axis default)
 const DEPARTMENTS = ["Department 1", "Department 2", "Department 3", "Department 4"];
-
+const MACHINE_SENSORS = ["vibration", "power"];
 const LINE_COLORS = [
   "#00aa33", "#0077ff", "#ff6b6b", "#ffa600", "#8e44ad", "#16a085", "#c0392b"
 ];
 
-/* ===========================
-    DEMO DATA HELPERS
-    =========================== */
+const THRESHOLDS = {
+  temperature: { warn: 30, crit: 35, unit: "°C", label: "Temperature" },
+  humidity:    { warn: 70, crit: 80, unit: "%RH", label: "Humidity" },
+  air:         { warn: 60, crit: 100, unit: "AQI", label: "Air Quality" },
+  vibration:   { warn: 2.5, crit: 3.5, unit: "mm/s", label: "Vibration" },
+  power:       { warn: 3.0, crit: 4.0, unit: "kW", label: "Power" },
+};
 
-// time axis helper (returns ['00:00','00:10',...])
-const buildTimeAxis = (points = 72, stepMin = 10) =>
-  Array.from({ length: points }, (_, i) => {
-    const m = i * stepMin;
-    const hh = String(Math.floor(m / 60)).padStart(2, "0");
-    const mm = String(m % 60).padStart(2, "0");
-    return `${hh}:${mm}`;
-  });
 
-// generate a noisy time series around a baseline
-const series = (axis, base, noise = 2, drift = 0, machineIndex = 0) =>
-  axis.map((t, i) => ({
-    time: t,
-    // Using (i + machineIndex) ensures a unique time offset for the sine wave
+const DEVICE_REGISTRY = {
+  "esp32-01": { deptIndex: 0, machineId: "m1" },
+};           
+
+// ---------------- demo helpers (kept for graceful fallback) ----------------
+const series = (axisLength, base, noise = 2, drift = 0, machineIndex = 0) =>
+  Array.from({ length: axisLength }, (_, i) => ({
+    time: `Demo ${i}`, // Use synthetic time for demo only
     value: Math.round((base + Math.sin((i + machineIndex) / 6) * noise + (Math.random() - 0.5) * noise + i * drift) * 10) / 10,
   }));
 
-// make department dataset for a sensor
-const makeDeptData = (axis, sensor) => {
-  // tweaked baselines (now corresponding to Dept 1, 2, 3, 4)
+const makeDeptData = (axisLength, sensor) => {
   const baselines = {
     temperature: [27, 29, 31, 28],
     humidity: [58, 62, 55, 60],
@@ -47,26 +50,22 @@ const makeDeptData = (axis, sensor) => {
     power: [2.1, 1.8, 2.6, 1.7],
   };
   const b = baselines[sensor] ?? [25, 25, 25, 25];
-
   return DEPARTMENTS.map((deptName, i) => ({
     name: deptName,
-    data: series(axis, b[i], 1.6),
+    data: series(axisLength, b[i], 1.6),
   }));
 };
 
-// make machines dataset within a department
-const makeMachineData = (axis, sensor, departmentName, machineCount = 5) => {
+const makeMachineData = (axisLength, sensor, departmentName, machineCount = 5) => {
   const base = sensor === "temperature" ? 29 : sensor === "humidity" ? 60 : sensor === "air" ? 36 : sensor === "vibration" ? 1.6 : 2.0;
-
   return Array.from({ length: machineCount }, (_, i) => ({
     id: `m${i + 1}`,
     name: `Machine ${i + 1}`,
-    // Pass the machine index (i) to the series generator to ensure uniqueness
-    data: series(axis, base + i * (sensor === "vibration" ? 0.2 : 0.5), 1.5, 0, i),
+    data: series(axisLength, base + i * (sensor === "vibration" ? 0.2 : 0.5), 1.5, 0, i),
   }));
 };
 
-// KPI & % out-of-range helpers
+// KPI helpers
 const avgOf = (arr) => (arr.reduce((a, b) => a + b, 0) / (arr.length || 1));
 const pctOutOfRange = (arr, warn) => {
   const n = arr.length || 1;
@@ -74,162 +73,297 @@ const pctOutOfRange = (arr, warn) => {
   return Math.round((out / n) * 100);
 };
 
-// default thresholds per sensor (adjust to your site)
-const THRESHOLDS = {
-  temperature: { warn: 30, crit: 35, unit: "°C", label: "Temperature" },
-  humidity:    { warn: 70, crit: 80, unit: "%RH", label: "Humidity" },
-  air:         { warn: 60, crit: 100, unit: "AQI", label: "Air Quality" },
-  vibration:   { warn: 2.5, crit: 3.5, unit: "mm/s", label: "Vibration" },
-  power:       { warn: 3.0, crit: 4.0, unit: "kW", label: "Power" },
-};
+// ---------------- mapping helper (uses DEVICE_REGISTRY) ----------------
+function mapDeviceToDeptMachine(deviceId = "unknown") {
+  if (DEVICE_REGISTRY[deviceId]) {
+    const { deptIndex, machineId } = DEVICE_REGISTRY[deviceId];
+    const dept = DEPARTMENTS[deptIndex] || DEPARTMENTS[0];
+    return { dept, machineId: machineId || "m1" };
+  }
+  // fallback: place unknown devices in Department 1
+  return { dept: DEPARTMENTS[0], machineId: `m_unknown` };
+}
 
-/* ===========================
-    MAIN COMPONENT
-    =========================== */
+// ---------------- build series from liveHistory ----------------
+function buildSeriesFromHistory(historyMap, deptKey, sensorField = "temperature", historyLimit = HISTORY_LIMIT) {
+  const deptResult = DEPARTMENTS.map((deptName) => {
+    const machines = historyMap[deptName] || {};
+    const machineArrays = Object.values(machines);
+    
+    // Find a machine array with data to determine the length and time points
+    const referenceArray = machineArrays.find(arr => arr.length > 0) || Array.from({ length: historyLimit });
 
-const MACHINE_SENSORS = ["vibration", "power"];
+    const data = Array.from({ length: historyLimit }, (_, idx) => {
+      const start = Math.max(0, referenceArray.length - historyLimit);
+      
+      const vals = machineArrays.map((arr) => {
+        const item = arr[start + idx] || null;
+        return item && typeof item[sensorField] === "number" ? item[sensorField] : null;
+      }).filter((v) => v !== null);
+      
+      const avg = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+      
+      // Use the time from the reference array (if available) or a placeholder
+      const time = referenceArray[start + idx]?.time || `T ${idx}`; 
 
+      return { time, value: Math.round(avg * 10) / 10 };
+    });
+
+    return { name: deptName, data };
+  });
+
+  const machinesInDept = historyMap[deptKey] || {};
+  const machineResult = Object.keys(machinesInDept).map((mid) => {
+    const arr = machinesInDept[mid] || [];
+    const start = Math.max(0, arr.length - historyLimit);
+    const data = Array.from({ length: historyLimit }, (_, i) => {
+      const item = arr[start + i] || {};
+      return { time: item.time || `T ${i}`, value: typeof item[sensorField] === "number" ? item[sensorField] : 0 };
+    });
+    return { id: mid, name: mid.replace(/^m/, "Machine "), data };
+  });
+
+  return { deptResult, machineResult };
+}
+
+// ---------------- MAIN COMPONENT ----------------
 export default function Analytics() {
+  // UI State
   const [sensor, setSensor] = useState("power");
   const [compare, setCompare] = useState("departments");
   const [deptKey, setDeptKey] = useState(DEPARTMENTS[0]);
   const [activeMachineId, setActiveMachineId] = useState("m1");
 
-  const [machineCountMap] = useState({
-    [DEPARTMENTS[0]]: 4,
-    [DEPARTMENTS[1]]: 3,
-    [DEPARTMENTS[2]]: 5,
-    [DEPARTMENTS[3]]: 4,
-  });
-  const [timePoints] = useState(72);
+  // Internal live history state
+  const [liveHistory, setLiveHistory] = useState({});
+  const timePoints = HISTORY_LIMIT; // Fixed points for demo fallback
 
-  const axis = useMemo(() => buildTimeAxis(timePoints, 10), [timePoints]);
   const thresholds = THRESHOLDS[sensor];
-
-  // Determine if machine comparison is allowed for the current sensor
   const isMachineComparisonAllowed = MACHINE_SENSORS.includes(sensor);
 
-  // useEffect to enforce 'departments' or 'department-deep' comparison mode when a non-machine sensor is selected
   useEffect(() => {
     if (!isMachineComparisonAllowed && (compare === 'machines' || compare === 'machine-deep')) {
-        // If the user was in a machine view, default them back to department comparison
-        setCompare('departments');
+      setCompare('departments');
     }
+  }, [sensor, compare, isMachineComparisonAllowed]);
+
+  // push reading helper - keeps a capped ring buffer for each machine
+  const pushReadingToHistory = (reading) => {
+    // reading: { deviceId, temperature, humidity, mqPct, ts }
+    const { deviceId, ts: tsRaw, temperature, humidity, mqPct } = reading;
+    const ts = tsRaw ? Number(tsRaw) : Date.now();
+    const p = mapDeviceToDeptMachine(deviceId || "unknown");
+    const dept = p.dept;
+    const machineId = p.machineId;
+    const time = new Date(ts).toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit" });
+
+    const point = {
+      ts,
+      time,
+      temperature: (typeof temperature === "number") ? temperature : (typeof temperature === "string" ? parseFloat(temperature) : null),
+      humidity: (typeof humidity === "number") ? humidity : (typeof humidity === "string" ? parseFloat(humidity) : null),
+      mqPct: (typeof mqPct === "number") ? mqPct : (typeof mqPct === "string" ? parseFloat(mqPct) : null),
+    };
+    
+    // Use functional update to safely append the new point
+    setLiveHistory((prev) => {
+      const prevDept = prev[dept] || {};
+      // Create a copy of the existing array and push the new point
+      const prevMachineArr = prevDept[machineId] ? [...prevDept[machineId]] : [];
+      
+      prevMachineArr.push(point);
+      
+      // Cap the history
+      while (prevMachineArr.length > HISTORY_LIMIT) prevMachineArr.shift();
+
+      return {
+        ...prev,
+        [dept]: {
+          ...prevDept,
+          [machineId]: prevMachineArr,
+        },
+      };
+    });
+  };
+
+  // Fetch initial history + connect socket
+  useEffect(() => {
+    let socket;
+    let mounted = true;
+
+    (async () => {
+      try {
+        const limit = 300;
+        const resp = await axios.get(`${API_BASE}/api/sensors?limit=${limit}`);
+        if (!mounted) return;
+        if (resp.data && resp.data.items) {
+          const items = resp.data.items.slice().reverse();
+          const initialHistory = {}; // Consolidate all updates here first
+
+          items.forEach((it) => {
+            const reading = {
+              deviceId: it.deviceId || "unknown",
+              temperature: it.temperature,
+              humidity: it.humidity,
+              mqPct: it.mqPct,
+              ts: it.ts || Date.now(),
+            };
+
+            const { dept, machineId } = mapDeviceToDeptMachine(reading.deviceId);
+            const time = new Date(Number(reading.ts)).toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit" });
+
+            const point = {
+              ts: Number(reading.ts),
+              time,
+              temperature: typeof reading.temperature === "number" ? reading.temperature : parseFloat(reading.temperature),
+              humidity: typeof reading.humidity === "number" ? reading.humidity : parseFloat(reading.humidity),
+              mqPct: typeof reading.mqPct === "number" ? reading.mqPct : parseFloat(reading.mqPct),
+            };
+
+            initialHistory[dept] = initialHistory[dept] || {};
+            initialHistory[dept][machineId] = initialHistory[dept][machineId] || [];
+            initialHistory[dept][machineId].push(point);
+          });
+          
+          // Cap the history for each machine before setting state
+          Object.values(initialHistory).forEach(deptData => {
+            Object.keys(deptData).forEach(machineId => {
+              const arr = deptData[machineId];
+              if (arr.length > HISTORY_LIMIT) {
+                deptData[machineId] = arr.slice(arr.length - HISTORY_LIMIT);
+              }
+            });
+          });
+          
+          setLiveHistory(initialHistory); // Set state once with consolidated data
+        }
+      } catch (err) {
+        console.error("Failed to load sensor history:", err);
+      }
+    })();
+
+    try {
+      socket = ioClient(SOCKET_URL, { transports: ["websocket"] });
+      socket.on("connect", () => console.log("Analytics socket connected", socket.id));
+      socket.on("sensor", (payload) => {
+        // Real-time updates use the functional setter form safely
+        pushReadingToHistory({
+          deviceId: payload.deviceId || "unknown",
+          temperature: payload.temperature,
+          humidity: payload.humidity,
+          mqPct: payload.mqPct,
+          ts: payload.ts || Date.now(),
+        });
+      });
+      socket.on("disconnect", () => console.log("Analytics socket disconnected"));
+    } catch (err) {
+      console.error("Socket error", err);
+    }
+
+    return () => {
+      mounted = false;
+      if (socket) socket.disconnect();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sensor]);
+  }, []);
 
-  // data
-  const deptSeries = useMemo(() => makeDeptData(axis, sensor), [axis, sensor]);
-  const machineSeries = useMemo(
-    () => makeMachineData(axis, sensor, deptKey, machineCountMap[deptKey] ?? 4),
-    [axis, sensor, deptKey, machineCountMap]
-  );
+  // Build series: prefer liveHistory; fallback to demo generators
+  const { deptSeries, machineSeries } = useMemo(() => {
+    const hasAny = Object.keys(liveHistory).length > 0;
+    if (!hasAny) {
+      // Use fixed HISTORY_LIMIT for demo data array length
+      return {
+        deptSeries: makeDeptData(timePoints, sensor),
+        machineSeries: makeMachineData(timePoints, sensor, deptKey, 4),
+      };
+    }
+    const sensorField = sensor === "air" ? "mqPct" : sensor;
+    const { deptResult, machineResult } = buildSeriesFromHistory(liveHistory, deptKey, sensorField, HISTORY_LIMIT);
+    return { deptSeries: deptResult, machineSeries: machineResult };
+  }, [liveHistory, sensor, deptKey, timePoints]); // Removed 'axis' dependency
 
-  // Find the active department for deep-dive
-  const activeDepartment = useMemo(
-    () => deptSeries.find(d => d.name === deptKey),
-    [deptSeries, deptKey]
-  );
-
-  // Find the currently active machine based on state
-  const activeMachine = useMemo(
-    () => machineSeries.find(m => m.id === activeMachineId),
-    [machineSeries, activeMachineId]
-  );
-
-
-  // Derived (KPI strip) for the current compare view
+  // KPI derived
   const kpi = useMemo(() => {
-    // --- Department Deep-Dive ---
-    if (compare === "department-deep" && activeDepartment) {
-        const allVals = activeDepartment.data.map((p) => p.value);
-        return {
-            merged: activeDepartment.data,
-            avg: avgOf(allVals),
-            peak: Math.max(...allVals),
-            por: pctOutOfRange(allVals, thresholds.warn),
-            activeName: activeDepartment.name
-        };
+    const getAxis = () => {
+      // Get the time points from the first series for merging
+      const seriesToUse = compare === "machines" || compare === "machine-deep" ? machineSeries : deptSeries;
+      return seriesToUse.length > 0 ? seriesToUse[0].data.map(p => p.time) : [];
+    };
+
+    if (compare === "department-deep") {
+      const active = deptSeries.find(d => d.name === deptKey);
+      if (!active) return { merged: [], avg: 0, peak: 0, por: 0, activeName: deptKey };
+      const allVals = active.data.map((p) => p.value);
+      return { merged: active.data, avg: avgOf(allVals), peak: Math.max(...allVals), por: pctOutOfRange(allVals, thresholds.warn), activeName: active.name };
     }
 
-    // --- Department Comparison ---
     if (compare === "departments") {
-      const merged = axis.map((t, idx) => {
+      const currentAxis = getAxis();
+      const merged = currentAxis.map((t, idx) => {
         const row = { time: t };
-        deptSeries.forEach((d) => (row[d.name] = d.data[idx].value));
+        deptSeries.forEach((d) => (row[d.name] = d.data[idx]?.value || 0));
         return row;
       });
-
       const allVals = deptSeries.flatMap((d) => d.data.map((p) => p.value));
-      const avg = avgOf(allVals);
-      const peak = Math.max(...allVals);
-      const por = pctOutOfRange(allVals, thresholds.warn);
-
-      return { merged, avg, peak, por };
+      return { merged, avg: avgOf(allVals), peak: Math.max(...allVals), por: pctOutOfRange(allVals, thresholds.warn) };
     }
 
-    // --- Machine Comparison ---
     if (compare === "machines") {
-      const merged = axis.map((t, idx) => {
+      const currentAxis = getAxis();
+      const merged = currentAxis.map((t, idx) => {
         const row = { time: t };
-        machineSeries.forEach((m) => (row[m.name] = m.data[idx].value));
+        machineSeries.forEach((m) => (row[m.name] = m.data[idx]?.value || 0));
         return row;
       });
-
       const allVals = machineSeries.flatMap((m) => m.data.map((p) => p.value));
-      const avg = avgOf(allVals);
-      const peak = Math.max(...allVals);
-      const por = pctOutOfRange(allVals, thresholds.warn);
-
-      return { merged, avg, peak, por };
+      return { merged, avg: avgOf(allVals), peak: Math.max(...allVals), por: pctOutOfRange(allVals, thresholds.warn) };
     }
 
-    // --- Machine Deep-Dive ---
-    if (compare === "machine-deep" && activeMachine) {
-        const allVals = activeMachine.data.map((p) => p.value);
-        return {
-            merged: activeMachine.data,
-            avg: avgOf(allVals),
-            peak: Math.max(...allVals),
-            por: pctOutOfRange(allVals, thresholds.warn),
-            activeName: activeMachine.name
-        };
+    if (compare === "machine-deep") {
+      const active = machineSeries.find(m => m.id === activeMachineId);
+      if (!active) return { merged: [], avg: 0, peak: 0, por: 0, activeName: activeMachineId };
+      const allVals = active.data.map((p) => p.value);
+      return { merged: active.data, avg: avgOf(allVals), peak: Math.max(...allVals), por: pctOutOfRange(allVals, thresholds.warn), activeName: active.name };
     }
+
     return { merged: [], avg: 0, peak: 0, por: 0, activeName: "N/A" };
-  }, [axis, compare, deptSeries, machineSeries, thresholds, activeMachine, activeDepartment]);
+  }, [compare, deptSeries, machineSeries, thresholds, deptKey, activeMachineId]);
 
-  // Bar chart: time above warn threshold (minutes) per series
+  // bars
   const bars = useMemo(() => {
     const stepMin = 10;
     if (compare === "departments") {
-      return deptSeries.map((d) => ({
-        name: d.name,
-        above: d.data.filter((p) => p.value > thresholds.warn).length * stepMin,
-      }));
+      return deptSeries.map((d) => ({ name: d.name, above: d.data.filter((p) => p.value > thresholds.warn).length * stepMin }));
     }
     if (compare === "machines") {
-      return machineSeries.map((m) => ({
-        name: m.name,
-        above: m.data.filter((p) => p.value > thresholds.warn).length * stepMin,
-      }));
+      return machineSeries.map((m) => ({ name: m.name, above: m.data.filter((p) => p.value > thresholds.warn).length * stepMin }));
     }
     return [];
   }, [compare, deptSeries, machineSeries, thresholds]);
 
-  // Determine which series to show in the Summary table
   const summarySeries = useMemo(() => {
-    // Show department data for department views or if machine views are not allowed
-    if (compare === "departments" || compare === "department-deep" || !isMachineComparisonAllowed) {
+    // Filter summary series for deep dives to only show the relevant item
+    if (compare === "department-deep") {
+        return deptSeries.filter(s => s.name === deptKey);
+    }
+    if (compare === "machine-deep") {
+        return machineSeries.filter(s => s.id === activeMachineId);
+    }
+    
+    // For comparison views, show all relevant series (departments or machines)
+    if (compare === "departments") {
         return deptSeries;
     }
-    // Show machine data for machine views
-    return machineSeries;
-  }, [compare, isMachineComparisonAllowed, deptSeries, machineSeries]);
+    if (compare === "machines") {
+        return machineSeries;
+    }
+    
+    return [];
+  }, [compare, deptSeries, machineSeries, deptKey, activeMachineId]);
 
 
   return (
     <Container fluid className="analytics-wrap">
-      {/* Header controls */}
       <Row className="mb-3 align-items-end">
         <Col md={3}>
           <Form.Label>Sensor</Form.Label>
@@ -246,59 +380,36 @@ export default function Analytics() {
           <Form.Select value={compare} onChange={(e) => setCompare(e.target.value)}>
             <option value="departments">Departments Comparison</option>
             <option value="department-deep">Department Deep-Dive</option>
-            <option
-                value="machines"
-                disabled={!isMachineComparisonAllowed}
-            >
-                Machines Comparison
-            </option>
-            <option
-                value="machine-deep"
-                disabled={!isMachineComparisonAllowed}
-            >
-                Machine Deep-Dive
-            </option>
+            <option value="machines" disabled={!isMachineComparisonAllowed}>Machines Comparison</option>
+            <option value="machine-deep" disabled={!isMachineComparisonAllowed}>Machine Deep-Dive</option>
           </Form.Select>
         </Col>
         <Col md={3}>
           <Form.Label>Department</Form.Label>
           <Form.Select
             value={deptKey}
-            onChange={(e) => {
-                setDeptKey(e.target.value);
-                setActiveMachineId("m1"); // Reset machine when dept changes
-            }}
+            onChange={(e) => { setDeptKey(e.target.value); setActiveMachineId("m1"); }}
             disabled={compare === "departments"}
           >
-            {DEPARTMENTS.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
+            {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
           </Form.Select>
         </Col>
 
-        {/* Machine Selector: Only appears in machine deep-dive mode, AND if the sensor is machine-enabled */}
         {isMachineComparisonAllowed && compare === "machine-deep" && (
           <Col md={3}>
             <Form.Label>Machine</Form.Label>
-            <Form.Select
-              value={activeMachineId}
-              onChange={(e) => setActiveMachineId(e.target.value)}
-            >
-              {machineSeries.map((m) => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
+            <Form.Select value={activeMachineId} onChange={(e) => setActiveMachineId(e.target.value)}>
+              {machineSeries.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </Form.Select>
           </Col>
         )}
 
-        {/* Render buttons in the appropriate column */}
         <Col md={isMachineComparisonAllowed && compare === "machine-deep" ? 3 : 6} className="text-md-end mt-3 mt-md-0 d-flex align-items-end justify-content-end">
-            <Button variant="outline-secondary" className="me-2">Export CSV</Button>
-            <Button variant="success">Download PNG</Button>
+          <Button variant="outline-secondary" className="me-2">Export CSV</Button>
+          <Button variant="success">Download PNG</Button>
         </Col>
       </Row>
 
-      {/* KPI strip (unchanged) */}
       <Row className="g-3 mb-3">
         <Col md={4}>
           <Card className="kpi-card">
@@ -335,53 +446,34 @@ export default function Analytics() {
         </Col>
       </Row>
 
-      {/* Main comparison chart */}
       <Card className="panel-card mb-3">
         <Card.Body>
           <div className="panel-title mb-2">
             {compare === "departments" && "Department Comparison"}
-            {compare === "department-deep" && `Deep-Dive: ${activeDepartment?.name || "N/A"}`}
+            {compare === "department-deep" && `Deep-Dive: ${deptKey}`}
             {compare === "machines" && `Machines in ${deptKey}`}
-            {compare === "machine-deep" && `Deep-Dive: ${activeMachine?.name || "N/A"}`}
+            {compare === "machine-deep" && `Deep-Dive: ${activeMachineId}`}
           </div>
-
           <div style={{ width: "100%", height: 320 }}>
             <ResponsiveContainer>
               {compare === "machine-deep" || compare === "department-deep" ? (
-                // Deep-Dive Charts (Single Line)
                 <LineChart data={kpi.merged}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
                   <XAxis dataKey="time" />
                   <YAxis />
                   <Tooltip />
-                  <Line
-                        type="monotone"
-                        dataKey="value"
-                        name={THRESHOLDS[sensor].label}
-                        stroke="#00aa33"
-                        dot={false}
-                    />
+                  <Line type="monotone" dataKey="value" name={THRESHOLDS[sensor].label} stroke="#00aa33" dot={false} />
                 </LineChart>
               ) : (
-                // Comparison Charts (Multiple Lines)
                 <LineChart data={kpi.merged}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
                   <XAxis dataKey="time" />
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  {/* Build lines dynamically */}
-                  {Object.keys(kpi.merged?.[0] || {})
-                    .filter((k) => k !== "time")
-                    .map((key, idx) => (
-                      <Line
-                        key={key}
-                        type="monotone"
-                        dataKey={key}
-                        stroke={LINE_COLORS[idx % LINE_COLORS.length]}
-                        dot={false}
-                      />
-                    ))}
+                  {Object.keys(kpi.merged?.[0] || {}).filter((k) => k !== "time").map((key, idx) => (
+                    <Line key={key} type="monotone" dataKey={key} stroke={LINE_COLORS[idx % LINE_COLORS.length]} dot={false} />
+                  ))}
                 </LineChart>
               )}
             </ResponsiveContainer>
@@ -389,7 +481,6 @@ export default function Analytics() {
         </Card.Body>
       </Card>
 
-      {/* Time above threshold bar chart (hidden for all deep-dive modes) */}
       {compare !== "machine-deep" && compare !== "department-deep" && (
         <Card className="panel-card mb-3">
           <Card.Body>
@@ -409,7 +500,6 @@ export default function Analytics() {
         </Card>
       )}
 
-      {/* Summary table */}
       <Card className="panel-card">
         <Card.Body>
           <div className="panel-title mb-2">Summary</div>
@@ -432,14 +522,8 @@ export default function Analytics() {
                 const status = peak >= thresholds.crit ? "Critical" : peak >= thresholds.warn ? "Warning" : "Normal";
                 const variant = status === "Critical" ? "danger" : status === "Warning" ? "warning" : "success";
 
-                // Only show the active department in department deep-dive mode
-                if (compare === "department-deep" && s.name !== deptKey) return null;
-
-                // Only show the active machine in machine deep-dive mode
-                if (compare === "machine-deep" && s.id !== activeMachineId) return null;
-
                 return (
-                  <tr key={s.name}>
+                  <tr key={s.id || s.name}>
                     <td>{s.name}</td>
                     <td className="text-end">{avg.toFixed(1)} {thresholds.unit}</td>
                     <td className="text-end">{peak.toFixed(1)} {thresholds.unit}</td>
