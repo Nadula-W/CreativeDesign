@@ -12,8 +12,8 @@ import {
 import "./Analytics.css";
 
 // ======= CONFIG =======
-const SOCKET_URL = "http://192.168.0.100:3000";
-const API_BASE = "http://192.168.0.100:3000";
+const SOCKET_URL = "http://192.168.0.102:3000";
+const API_BASE = "http://192.168.0.102:3000";
 const HISTORY_LIMIT = 72; // points to keep (matches axis default)
 const DEPARTMENTS = ["Department 1", "Department 2", "Department 3", "Department 4"];
 const MACHINE_SENSORS = ["vibration", "power"];

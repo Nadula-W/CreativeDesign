@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 
-const SOCKET_URL = "http://192.168.0.100:3000";
+const SOCKET_URL = "http://192.168.0.102:3000";
 
 // Only these alerts will display in this dashboard (worker alerts ignored)
 const EMERGENCY_TYPES = ["FIRE", "ELECTRICAL", "MEDICAL"];
@@ -78,7 +78,7 @@ export default function EmergencyDashboard() {
   // ----------------------------
   const loadHistory = async () => {
     try {
-      const resp = await fetch("http://192.168.0.100:3000/api/alerts?limit=100");
+      const resp = await fetch("http://192.168.0.102:3000/api/alerts?limit=100");
       const data = await resp.json();
 
       if (data.ok && Array.isArray(data.items)) {

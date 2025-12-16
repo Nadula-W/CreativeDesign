@@ -14,7 +14,7 @@ const COLOR_WHITE = "#FFFFFF";
 // ---------------
 
 // NOTE: change IP if needed
-const SERVER_IP = "192.168.0.100";
+const SERVER_IP = "192.168.0.102";
 const API_URL = `http://${SERVER_IP}:3000/api`;
 const SOCKET_URL = `http://${SERVER_IP}:3000`;
 

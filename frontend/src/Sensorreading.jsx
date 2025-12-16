@@ -4,7 +4,7 @@ import { io } from "socket.io-client";
 import Meter from "./component/Meter";
 import "./Sensorreading.css";
 
-const SOCKET_URL = "http://192.168.0.100:3000"; // same as your EmergencyDashboard
+const SOCKET_URL = "http://192.168.0.102:3000"; // same as your EmergencyDashboard
 
 // ---- helper functions for status text + color ----
 
